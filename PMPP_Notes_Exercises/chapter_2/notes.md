@@ -1,6 +1,6 @@
 ## PMPP Chapter 2 Notes: Heterogenous Data Parallel Computing
 
-/tableofcontents
+
 
 ### Data parallelism
 
