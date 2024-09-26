@@ -1,5 +1,7 @@
 ## PMPP Chapter 2 Notes: Heterogenous Data Parallel Computing
 
+/tableofcontents
+
 ### Data parallelism
 
 * Independent evaluation of different pieces of data is the basis of "data parallelism"
@@ -31,7 +33,7 @@
 * **Note**: In the context of data parallelism the number of threads launched are usually the number of elements in the data
 * CUDA Programmers can assume that these threads take very few clock cycles to generate and schedule. This assumption contrasts with tradition CPU threads, which typically take thousands of clock cycles to generate and schedule 
 
-```mermaid
+```
 CUDA Execution WorkFlow:  
     CPU Serial Code --> Device Parallel Kernel Code (KenelA<<<nBlk, nTid>>>) --> CPU Serial Code --> Device Parallel Kernel Code (KenelB<<<nBlk, nTid>>>)
 
@@ -84,7 +86,7 @@ void VecAdd(float* A_h, float* B_h, float* C_h, int n){
     float *A_d, float *B_d, float* C_d;
 
     // Part 1: Allocate device memory for A, B and C
-    cudaMalloc((void**)&A_d, size))=;
+    cudaMalloc((void**)&A_d, size);
     cudaMalloc((void**)&B_d, size);
     cudaMalloc((void**)&C_d, size);
 
@@ -109,8 +111,9 @@ void VecAdd(float* A_h, float* B_h, float* C_h, int n){
     cudaFree(B_d);
     cudaFree(C_d);
 ```
+**IMP**: We refer to the above type of host code as `stub` for calling a kernel, which involves allocating space and copying data and invoking kernel function etc.
 
-**Note::**
+**Note:**
 * Often the copying of memory back and forth creates a bottleneck and we don't ge the desired performance, and we usually don't copy the datastructures/variables that often from device to host and host to device. We instead keep large and important data structures on the device and simply invoke device functions on them from the host code
 
 ### Device Memory Specific CUDA API Functions
@@ -126,3 +129,130 @@ void VecAdd(float* A_h, float* B_h, float* C_h, int n){
 * `cudaFree()`:
     * Frees object from device global memory
     * **Pointer** to freed object
+* `cudaMemcpy`:
+    * Memory Data Transfer
+    * Requires four params:
+        * Pointer to destination: `A_d` if device or `A_h` if host
+        * Pointer to source: `A_d` if device or `A_h` if host
+        * Number of bytes copied: `size`
+        * Type/Direction of Transfer: `cudaMemcpyDeviceToHost` or `cudaMemcpyHostToDevice`
+* **Note**: 
+    * CUDA C also has more  advanced library functions for allocating space in the host memory.
+    * The fact that `cudaMalloc()` returns a generic object makes the use of dynamically allocated multi-dimensional arrays more complex.
+    * `cudaMalloc()` has a different format from the C malloc function. 
+
+### Difference between C Malloc and cudaMalloc function:
+
+#### C malloc function:
+
+* It allocates memory on the host (CPU).
+* It takes one parameter: the size of memory to allocate (in bytes).
+* It returns a pointer to the allocated memory.
+* Usage: void* ptr = malloc(size);
+
+
+#### CUDA cudaMalloc() function:
+
+* It allocates memory on the device (GPU).
+* It takes two parameters:
+    * A pointer to a pointer (the address where the allocated memory pointer will be stored).
+    * The size of memory to allocate (in bytes).
+
+
+* It returns an error code to indicate success or failure.
+* Usage: cudaError_t error = cudaMalloc((void**)&dev_ptr, size);
+
+
+
+**The key differences are:**
+
+* Return value:
+
+    * malloc returns the allocated memory address directly.
+    * cudaMalloc() returns an error code and writes the allocated memory address to the provided pointer.
+
+
+* Error handling:
+
+    * With malloc, you check if the returned pointer is NULL to detect errors.
+    * With cudaMalloc(), you check the returned error code for any issues.
+
+
+* Memory location:
+
+    * malloc allocates on the host (CPU) memory.
+    * cudaMalloc() allocates on the device (GPU) memory.
+
+
+**Note**:  
+* The two-parameter format of cudaMalloc() allows it to be consistent with other CUDA API functions, which typically return error codes for uniform error handling across the CUDA ecosystem.
+
+* The addresses in A_d, B_d and C_d point to locations in the device global memory. These addresses should not be dereferenced in the host code. They should be used in calling API functions an dkernel functions.
+* Dereferencing a device global memory pointer in host code can cause exceptions or other types of runtime errors.
+
+### Error Checking and Error Handling in CUDA
+* CUDA API Functions return flags that indicate whether an erros has occured when they served the request
+* In practice we surround the `cudaMalloc()` call with code that test for error condition and print out error messages.
+* A simple version of such code:
+```cpp
+cudaError_t err = cudaMalloc((void**)&A_d, size);
+if(error != cudaSuccess)  {
+    printf("%s in %s at line %d \n",         cudaGetErrorString(err),
+    __FILE__,__LINE__)'
+    exit(EXIT_FAILURE);
+}
+```
+* This way if system is out of device memory,the user will be informed about the situation. This can save many hours of debugging time. 
+* A C Macro that can be reused for this purpose:
+```cpp
+#define CHECK_ERROR(call) { \
+cudaError_t err = call; \
+if (err != cudaSuccess) { \
+printf("%s in %s at line %d\n", cudaGetErrorString(err), __FILE__, __LINE__); \
+exit(err); \
+} \
+}
+
+```
+
+### Kernel Functions and Threading
+* Since all the threads execute the same code, CUDA C programming is an instance of the well-known single-program multiple-data (SPMD) style
+* When the program's host code calls a kernel, the CUDA runtime system launches a grid of threads that are organized into a two-level heirarchy
+* Hierarchy of CUDA Kernel Grid:
+    * `grid` : An array of threaded blocks (All blocks of grid are of same size)
+    * `blocks`: Contains threads (each block contain upto `1024 threads`)
+    * `threads`: abstraction for unit of computation
+
+#### CUDA Bult-in Variables
+* The values of these variables are often pre-initialized by the runtime system and are typically read-only in the program(we should refrain from redefining these variables)
+
+* The total no. of threads in each thread  block is specified by the host code when a kernel is called.
+* The same kernel can be called with different numbers of threads at different parts of the host code
+
+* Built-in variables
+    * `blockDim`: The number of threads in a block
+        * It's variable struct with three unsigned integer (x,y and z)
+        * For 1-D data only x field is used, for 2-D data both x and y field are used, for 3-D data all x,y and z fields are used
+        * The choice of the dimensionality for organizing threads usually reflects the dimensionality of data
+        * In general it is recommended that the number of threads in each dimensions of a thread block be a multiple of 32 for hardware efficiency reasons
+    * `threadIdx`: Gives each thread a unique coordinate within a block. For e.g. 1-D Data uses only `threadIdx.x`
+    * `blockIdx`: Gives all threads in a block a common co-ordinate
+
+
+**IMPORTANT NOTE**: 
+* To calculate the global index i for a unique specific thread in a grid we use `i = blockDim.x * blockIdx.x + threadIdx.x` for 1-D organization of threads
+* The above basically calculates a unique thread index for every thread in a grid. for example, the 5th thread in the Block 1 of 256 thread count(note it starts with Block 0 indexing) will be calculated `i = 1 * 256 + 5 = 261(global thread index)`
+
+> #### Reason for Multiples of 32 Threads
+This recommendation is based on how GPUs, particularly NVIDIA GPUs, are designed and function at the hardware level.  
+In NVIDIA GPUs, threads are executed in groups called **warps**. A warp consists of **32 threads** that execute in lockstep (i.e., they execute the same instruction at the same time).  
+GPUs use a **Single Instruction, Multiple Thread (SIMT) architecture**. This means that all threads in a warp execute the same instruction, but on different data.  
+When the number of threads in a block is a multiple of 32, it aligns perfectly with the warp size. This leads to several efficiency benefits:
+* Full warp utilization: All threads in each warp are active, maximizing parallel execution.
+* Reduced divergence: Threads within a warp are less likely to diverge in their execution paths.
+* Memory coalescing: Memory accesses are more likely to be coalesced, improving memory bandwidth utilization.
+* Scheduling efficiency: The GPU's thread scheduler can work more efficiently when dealing with full warps.
+Resource allocation:
+GPU resources (like shared memory and registers) are often allocated on a per-warp basis. Using multiples of 32 threads ensures optimal resource utilization.
+Avoiding partial warps:
+If the number of threads is not a multiple of 32, the last warp will be partially filled. This partial warp still consumes the resources of a full warp but doesn't fully utilize the GPU's processing capability.
