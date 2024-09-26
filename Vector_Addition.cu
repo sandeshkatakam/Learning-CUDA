@@ -10,6 +10,7 @@
 #include <time.h>
 #include <math.h>
 
+// CHECK ERROR Macro (Reuse this!!)
 #define CHECK_ERROR(call) { \
 cudaError_t err = call; \
 if (err != cudaSuccess) { \
@@ -20,6 +21,15 @@ exit(err); \
 
 // compute vector sum C = A+B
 // each thread performs one pair-wise addition
+// Notes:
+// We use i<n in the if condition to faciliate computation of arbitrary length of vectors
+// otherwise we compute only mulitples of Thread_numbers(for example 256)
+// we stop the comptuation after i reaches the value of the length of the vector
+// blockDim, blockIdx, threadIdx are pre-defined variables in the CUDA Language extension
+// these take different values for each thread and that's the reason we skip the for loop and just use if statement
+// i is the global index calculated uniquely for each thread
+// Below this the actual kernel code that is doing the comptuation (in this case vector sum)
+
 __global__ // executed on the device, only callable from the host
 void vecAddKernel(float *A, float *B, float *C, int n) {
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
@@ -29,8 +39,16 @@ void vecAddKernel(float *A, float *B, float *C, int n) {
 		C[i] = A[i] + B[i];
 	}
 }
+// Notes:
+// Here the VecAdd is the kernel launching code
+// It contains the above VecAddKernel code to invoke the computation 
+// After copying necessary variables onto the device
+//CHECK_ERROR macro wrapped around cudaMalloc gives a descriptive error (easy to debug)
+// ceil(n/256.0) can also be computed as (n+256-1/256)
+// <<< num_blocks_needed, num_threads_per_block  >>> is specific to CUDA kernels whcih contains thread and block related specifications along with parameters
+// Free the Device variables will take away the variable pointers to the available device memory pool
 
-__global__
+__global__ 
 void VecAdd(float* A_h, float* B_h, float* C_h, int n){
 
     int size = n*sizeof(n);
@@ -56,7 +74,7 @@ void VecAdd(float* A_h, float* B_h, float* C_h, int n){
 	// dim3 dimGrid(ceil(n / 256.0),1,1);
 	// dim3 dimBlock((256.0),1,1);
 
-    
+
     // Copy C_d from device to host C_h
     cudaMemcpy(C_h, C_d, size, cudaMemcpyDeviceToHost);
     cudaFree(A_d);
@@ -65,6 +83,7 @@ void VecAdd(float* A_h, float* B_h, float* C_h, int n){
 
 }
 
+// Host Code Computation of Vector Addition
 VecAdd_host(float* A_h, float* B_h, float* C_h, int n){
     for (i = 0; i<n; i++){
         C_h[i] = A_h[i] + B_h[i];
