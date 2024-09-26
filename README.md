@@ -5,4 +5,4 @@ This repository contains CUDA Kernels for Basic Math Operations(MatrixMultiplica
 Implemented CUDA Kernels:
 * Vector Addition
 * Matrix Multiplication
-* 
+* Image Manipulation(RGB Color Image to Grey Scale Image)
