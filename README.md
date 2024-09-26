@@ -9,10 +9,10 @@ This repository contains CUDA Programs, Notes from PMPP Book and Solutions to PM
 
 | Chapters | Notes | Exercise Solutions |  
 | --- | --- | --- |  
-| Chapter 1 | [Notes](/workspaces/CUDA_Kernels/PMPP_Notes_Exercises/chapter_1/notes.md) | Solutions |
-| Chapter 2 | [Notes](/workspaces/CUDA_Kernels/PMPP_Notes_Exercises/chapter_2/notes.md) | Solutions |  
-| Chapter 3 | [Notes](/workspaces/CUDA_Kernels/PMPP_Notes_Exercises/chapter_3/notes.md) | Solutions |  
-| Chapter 4 | [Notes](/workspaces/CUDA_Kernels/PMPP_Notes_Exercises/chapter_4/notes.md) | Solutions |
+| Chapter 1 | [Notes](https://github.com/sandeshkatakam/Learning-CUDA/blob/main/PMPP_Notes_Exercises/chapter_1/notes.md) | Solutions |
+| Chapter 2 | [Notes](https://github.com/sandeshkatakam/Learning-CUDA/blob/main/PMPP_Notes_Exercises/chapter_2/notes.md) | Solutions |  
+| Chapter 3 | [Notes](https://github.com/sandeshkatakam/Learning-CUDA/blob/main/PMPP_Notes_Exercises/chapter_3/notes.md) | Solutions |  
+| Chapter 4 | [Notes](https://github.com/sandeshkatakam/Learning-CUDA/blob/main/PMPP_Notes_Exercises/chapter_4/notes.md) | Solutions |
 
 
 ## **Implemented CUDA Kernels:**
