@@ -229,7 +229,7 @@ exit(err); \
 * The total no. of threads in each thread  block is specified by the host code when a kernel is called.
 * The same kernel can be called with different numbers of threads at different parts of the host code
 
-* Built-in variables
+* **Built-in variables**
     * `blockDim`: The number of threads in a block
         * It's variable struct with three unsigned integer (x,y and z)
         * For 1-D data only x field is used, for 2-D data both x and y field are used, for 3-D data all x,y and z fields are used
@@ -256,3 +256,66 @@ Resource allocation:
 GPU resources (like shared memory and registers) are often allocated on a per-warp basis. Using multiples of 32 threads ensures optimal resource utilization.
 Avoiding partial warps:
 If the number of threads is not a multiple of 32, the last warp will be partially filled. This partial warp still consumes the resources of a full warp but doesn't fully utilize the GPU's processing capability.
+
+#### CUDA C Extension to C language (Keywords)
+* `__global__` :
+    * keyword indicates that the function being declared is a CUDA C kernel function
+    * Such a kernel function is executed on the device and can be called from the host.
+    * In CUDA systems, that supports **dynamic parallelism** it can also be called from the device
+* `__device__`:
+    * Keyword indicates  that the function being declared is a CUDA device function
+    * Such function executes on a CUDA device and can be called only from a kernel function or another device function
+    * The device function is excuted by the device thread that calls it and does not result in any new device threads being launched
+* `__host__`:
+    * Keyword indicates that the function being declares is a CUDA host function
+    * Such function ia simply a traditional C function that executes on the host and can be called only from antoer host function
+    * By default all functions in CUDA program are host functions if they do not have any of the CUDA keywords in their declaration
+
+**Imp Notes**: 
+* Both `__host__` and `__device__` in a function declaration tells the compilation system to generate two versions of the object code for the same function. Many user library functions will likely fall into this category  
+* The next notable extension to C is built-in variables `threadIdx`, `blockDim`, `blockIdx` . Different threads will see
+different values in their `threadIdx.x`, `blockIdx.x`, `blockDim.x` variables. 
+* `i` is the automatic variable. In a CUDA Kernel function,
+automatic variables are private to each thread. If the grid is launched with 10,000 threads, there will be 10,000 versions of i.
+* There is an `if(i<n)` statement in addVecKernel. This is because not all vector lengths can be expressed as multiples of block size. 
+For example, assume vector length is 100, the smallest efficient block dimension is 32, one would need to lauch four thread blocks to process all 100 vector elements.
+But four blocks contain 128 threads, inorder to disable the last 28 threads in thread block 3 from doint work not expected by the original program.
+
+
+* **A Table of CUDA C Keywords for Function declaration:**
+
+| **Qualifier Keyword** | **Callable From** | **Executed on** | **Executed by** |
+| --- | --- | --- | --- |  
+| `__host__`(default) | Host | Host | Caller host thread |
+| `__global__` | Host (or Device) | Device | New grid of device threads |
+| `__device__` | Device | Device | Caller Device thread |
+
+### Calling Kernel Functions:
+
+```cpp
+int vecAdd(float* A, float* B, float* C, int n) {
+    // A_d, B_d, C_d allocations and copies are done here
+
+    ...
+    // Launch ceil (n/256) blocks of 256 threads each
+    vecAddKernel<<<ceil(n/256.0), 256>>>(A_d, B_d, C_d, n);
+
+}
+```
+* When host code calls a kernel, it sets the grid and thread blok dimensions via **execution configuration parameters**
+* The config params are given between the `<<<` and `>>>` before the traditional C function arguments.
+    * First config param gives the number of blocks in the grid
+    * Second one specifies the number of threads in each block
+
+* Note that all the thread locks operate on different parts of the vectors, and executed in any arbitrary order. The programmer must not make any assumptions regarding execution order
+* A small GPU with a small amount of execution resources may execute only one or two of these blocks in parallel. A larger GPU may excute 64 or 128 blocks in parallel
+* This gives CUDA kernels scalability in execution speed with hardware i.e., the same code runs at lower speed on small GPUs and higher speed on larger GPUs
+
+### CUDA Compilation Process
+* **Compiler**: NVCC Compiler (NVIDIA C Compiler)
+* The NVCC Compiler processes a CUDA C program, using the CUDA keywords to separate the host code and device code.
+* The host code is straight ANSI C Code, which is compiled with host's standard C/C++ compilers
+* The device code which is marked with CUDA keywords that designate CUDA kernels and their associated helper functions and datastructures, is compile dby NVCC into virutal binary files called **PTX**(equivalent to assembly code in CPU)
+* These **PTX** files are further compiled by a runtime component of NVCC into real object files and executed on a CUDA GPU device
+
+
